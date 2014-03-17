@@ -1,0 +1,25 @@
+Developed by...
+Alex Schearer,http://anotherearlymorning.com/
+Jonathan Jou
+
+With help from...
+Julia Foran
+Adam Finklestein
+Alberto Martinelli
+
+Music and Sound...
+Snake Music 2 by Hein
+DrPetter's sfxr
+
+Art and Text...
+Brusheezy,http://brusheezy.com/
+1001 Free Fonts,http://1001freefonts.com/
+
+Thanks to...
+Slick,http://slick.cokeandcode.com/
+LWJGL,http://lwjgl.org/
+Lost Garden,http://lostgarden.com/
+GitHub,http://github.com/
+
+
+Thanks for playing

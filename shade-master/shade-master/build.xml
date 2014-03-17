@@ -1,0 +1,279 @@
+<?xml version="1.0" ?>
+
+<!--
+
+Shade build file.
+
+ant setup Initialize Shade environment.
+ant compile Run to compile the code.
+ant run Run to launch Shade 
+ant webstart Deploy shade as a webstart.
+ant clean Removes products of the build process, etc.
+
+Alex Schearer
+-->
+<project name="Shade" default="compile">
+        <property name="repo" value="https://oss.sonatype.org/content/repositories/releases"/>
+    <property name="src.dir" value="src/com" />
+    <property name="res.dir" value="res" />
+    <property name="lib.dir" value="lib" />
+    <property name="obj.dir" value="target/classes" />
+    <property name="target.dir" value="." />
+    <property name="script.dir" value="script" />
+    <property name="webstart.dir" value="${target.dir}/webstart" />
+        <property name="cucumber-jvm.version" value="1.1.5"/>
+    <property name="cucumber-jvm-deps.version" value="1.0.3"/>
+    <property name="gherkin.version" value="2.12.1"/>
+    <property name="cucumber-html.version" value="0.2.3"/>
+    <property name="jchronic.version" value="0.2.6"/>
+    <property name="junit.version" value="4.11"/>
+    <property name="jars" value="lib"/>
+        <property name="junitloc" value =
+"~/Applications/eclipse/plugins/org.junit_4.11.0.v201303080030/junit.jar"/>
+    <!-- Set up the Shade environment including preparing the natives. -->
+    <target name="setup" depends="check-setup" unless="setup.exists">
+        <delete dir="${lib.dir}/natives" />
+        <mkdir dir="${lib.dir}/natives" />
+        <unzip src="${lib.dir}/natives-win32.jar" dest="${lib.dir}/natives" />
+        <unzip src="${lib.dir}/natives-mac.jar" dest="${lib.dir}/natives" />
+        <unzip src="${lib.dir}/natives-linux.jar" dest="${lib.dir}/natives" />
+        <get
+src="${repo}/info/cukes/cucumber-core/${cucumber-jvm.version}/cucumber-core-${cucumber-jvm.version}.jar"
+             dest="${lib.dir}/cucumber-core-${cucumber-jvm.version}.jar"/>
+        <get
+src="${repo}/info/cukes/cucumber-java/${cucumber-jvm.version}/cucumber-java-${cucumber-jvm.version}.jar"
+             dest="${lib.dir}/cucumber-java-${cucumber-jvm.version}.jar"/>
+        <get
+src="${repo}/info/cukes/cucumber-html/${cucumber-html.version}/cucumber-html-${cucumber-html.version}.jar"
+             dest="${lib.dir}/cucumber-html-${cucumber-html.version}.jar"/>
+        <get
+src="${repo}/info/cukes/cucumber-junit/${cucumber-jvm.version}/cucumber-junit-${cucumber-jvm.version}.jar"
+             dest="${lib.dir}/cucumber-junit-${cucumber-jvm.version}.jar"/>
+        <get
+src="${repo}/info/cukes/cucumber-jvm-deps/${cucumber-jvm-deps.version}/cucumber-jvm-deps-${cucumber-jvm-deps.version}.jar"
+             dest="${lib.dir}/cucumber-jvm-deps-${cucumber-jvm-deps.version}.jar"/>
+        <get
+src="${repo}/info/cukes/gherkin/${gherkin.version}/gherkin-${gherkin.version}.jar"
+             dest="${lib.dir}/gherkin-${gherkin.version}.jar"/>
+        <get
+src="${repo}/com/rubiconproject/oss/jchronic/${jchronic.version}/jchronic-${jchronic.version}.jar"
+             dest="${lib.dir}/jchronic-${jchronic.version}.jar"/>
+        <get src="${repo}/junit/junit/${junit.version}/junit-${junit.version}.jar"
+             dest="${lib.dir}/junit-${junit.version}.jar"/>
+    </target>
+
+    <!-- Compile and archive Shade. -->
+    <target name="jar">
+        <antcall target="compile" />
+        <antcall target="archive" />
+    </target>
+
+    <!-- Run Shade. -->
+    <target name="run" depends="setup,compile">
+        <java fork="true" classname="com.shade.Shade">
+            <classpath>
+                <pathelement path="${obj.dir}" />
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar" />
+                </fileset>
+            </classpath>
+            <jvmarg value="-Djava.library.path=lib/natives" />
+        </java>
+    </target>
+
+    <!-- Clean up the environment. -->
+    <target name="clean">
+        <delete includeEmptyDirs="true">
+            <fileset dir="${obj.dir}" includes="**/*" defaultExcludes="no" />
+        </delete>
+        <delete file="${target.dir}/shade.jar" />
+        <delete>
+            <fileset dir="${src.dir}" includes="**/*.orig" />
+        </delete>
+        <delete>
+            <fileset dir="." defaultExcludes="no">
+                <include name="**/*.DS_Store"/>
+            </fileset>
+        </delete>
+        <delete dir="${webstart.dir}" />
+    </target>
+
+    <target name="format">
+        <exec executable="${script.dir}/astyle">
+            <arg value="-p" />
+            <arg value="-r" />
+            <arg value="-c" />
+            <arg value="--style=java" />
+            <arg value="${src.dir}/*" />
+        </exec>
+    </target>
+
+    <!-- Create a webstart directory in order to deploy Shade. -->
+    <target name="webstart" depends="jar">
+        <input message="Web server url:" addproperty="codebase" />
+        <delete dir="${webstart.dir}" />
+        <mkdir dir="${webstart.dir}" />
+        <copy file="${script.dir}/htaccess" tofile="${webstart.dir}/.htaccess" />
+        <copy file="${target.dir}/shade.jar" tofile="${webstart.dir}/shade.jar" />
+        <copy file="${target.dir}/lib/crash.jar" tofile="${webstart.dir}/crash.jar" />
+        <copy file="${target.dir}/lib/slickfx.jar"
+tofile="${webstart.dir}/slickfx.jar" />
+        <copy file="${target.dir}/lib/BareBonesBrowserLaunch.jar"
+tofile="${webstart.dir}/BareBonesBrowserLaunch.jar" />
+        <copy file="${script.dir}/template.jnlp" tofile="${webstart.dir}/shade.jnlp">
+            <filterchain>
+                <replacetokens>
+                    <token key="codebase" value="${codebase}" />
+                </replacetokens>
+            </filterchain>
+        </copy>
+        <antcall target="signjar" />
+    </target>
+
+    <!-- Determines whether setup has been run. -->
+    <target name="check-setup">
+        <condition property="setup.exists">
+            <available file="${lib.dir}/natives" type="dir" />
+        </condition>
+    </target>
+
+
+    <!-- Determines whether a keystore exists. -->
+    <target name="check-keystore">
+        <input message="Username:" addproperty="keystore.alias" />
+        <input message="Password:" addproperty="keystore.pass" />
+        <condition property="keystore.exists">
+            <available file="${target.dir}/${keystore.alias}.ks" type="file" />
+        </condition>
+    </target>
+
+    <!-- Create a key store. -->
+    <target name="keystore" depends="check-keystore" unless="keystore.exists">
+        <input message="Full Name:" addproperty="keystore.name" />
+        <input message="Company:" addproperty="keystore.company" />
+
+        <genkey keystore="${target.dir}/${keystore.alias}.ks"
+                alias="${keystore.alias}"
+                storepass="${keystore.pass}">
+            <dname>
+                <param name="CN" value="${keystore.name}" />
+                <param name="OU" value="${keystore.company}" />
+                <param name="O" value="" />
+                <param name="C"  value=""/>
+            </dname>
+        </genkey>
+    </target>
+
+    <!-- Sign's webstart/shade.jar for deployment. -->
+    <target name="signjar" depends="keystore">
+        <signjar jar="${webstart.dir}/shade.jar"
+                 keystore="${target.dir}/${keystore.alias}.ks" 
+                 storepass="${keystore.pass}"
+                 alias="${keystore.alias}" />
+        <signjar jar="${webstart.dir}/crash.jar"
+                 keystore="${target.dir}/${keystore.alias}.ks" 
+                 storepass="${keystore.pass}"
+                 alias="${keystore.alias}" />
+        <signjar jar="${webstart.dir}/slickfx.jar"
+                 keystore="${target.dir}/${keystore.alias}.ks" 
+                 storepass="${keystore.pass}"
+                 alias="${keystore.alias}" />
+        <signjar jar="${webstart.dir}/BareBonesBrowserLaunch.jar"
+                 keystore="${target.dir}/${keystore.alias}.ks" 
+                 storepass="${keystore.pass}"
+                 alias="${keystore.alias}" />
+    </target>
+
+        <target name ="classpath">
+        <path id="classpath">
+            <fileset dir="${lib.dir}">
+                <include name="**/*.jar"/>
+            </fileset>
+            <pathelement location="target/classes"/>
+            <pathelement location="target/test-classes"/>
+                <pathelement path="${lib.dir}/slick.jar" />
+            <pathelement path="${lib.dir}/lwjgl.jar" />
+            <pathelement path="${lib.dir}/crash.jar" />
+            <pathelement path="${lib.dir}/slickfx.jar" />
+            <pathelement path="${lib.dir}/ibxm.jar" />
+            <pathelement path="${lib.dir}/BareBonesBrowserLaunch.jar" />
+            <pathelement path="${lib.dir}/cucumber-core-${cucumber-jvm.version}.jar"/>
+            <pathelement path="${lib.dir}/cucumber-java-${cucumber-jvm.version}.jar"/>
+            <pathelement path="${lib.dir}/cucumber-html-${cucumber-html.version}.jar"/>
+            <pathelement path="${lib.dir}/cucumber-junit-${cucumber-jvm.version}.jar"/>
+            <pathelement
+path="${lib.dir}/cucumber-jvm-deps-${cucumber-jvm-deps.version}.jar"/>
+            <pathelement path="${lib.dir}/gherkin-${gherkin.version}.jar"/>
+            <pathelement path="${lib.dir}/jchronic-${jchronic.version}.jar"/>
+            <pathelement path="${lib.dir}/junit-${junit.version}.jar"/>
+                <pathelement path="${lib.dir}/mockito-all-1.9.5.jar"/>
+                <pathelement path="${lib.dir}/powermock-mockito-1.5.4-full.jar"/>
+        </path>
+        </target>
+    <!-- Compile the code put results into obj.dir. -->
+    <target name="compile" depends ="classpath">
+        <mkdir dir="${obj.dir}" />
+        <javac destdir="${obj.dir}" classpathref="classpath" debug="on"
+includeantruntime="false">
+            <src path="${src.dir}"/>
+        </javac>
+        <copy todir="${obj.dir}">
+            <fileset dir="${res.dir}" />
+        </copy>
+    </target>
+        
+        <target name ="compile-test" depends="compile, classpath">
+                 <mkdir dir="target/test-classes"/>
+                 <javac srcdir="src/test/java" destdir="target/test-classes"
+classpathref="classpath" includeantruntime="false"/>
+        </target>
+
+    <!-- Jar compiled code and place result into target.dir. -->
+    <target name="archive">
+        <jar destfile="${target.dir}/shade.jar" manifest="${script.dir}/manifest.txt">
+            <fileset dir="${obj.dir}" />
+        </jar>
+    </target>
+
+
+            <target name="runcukes" depends="compile-test, classpath">
+                <mkdir dir="target/cucumber-junit-report"/>
+                <java classname="cucumber.api.cli.Main" fork="true" failonerror="false"
+resultproperty="cucumber.exitstatus">
+                    <classpath refid="classpath"/>
+                    <arg value="--format"/>
+                    <arg value="junit:target/cucumber-junit-report.xml"/>
+                    <arg value="--format"/>
+                    <arg value="pretty"/>
+                    <arg value="--format"/>
+                    <arg value="html:target/cucumber-html-report"/>
+                    <arg value="--glue"/>
+                  <!--  <arg value="src/com"/> -->
+                        <arg value="src"/>
+                    <arg value="src/test/resources"/>
+                </java>
+
+                <junitreport todir="target/cucumber-junit-report">
+                    <fileset dir="target">
+                        <include name="cucumber-junit-report.xml"/>
+                    </fileset>
+                    <report format="frames" todir="target/cucumber-junit-report"/>
+                </junitreport>
+
+                <fail message="Cucumber failed">
+                    <condition>
+                        <not>
+                            <equals arg1="${cucumber.exitstatus}" arg2="0"/>
+                        </not>
+                    </condition>
+                </fail>
+            </target>
+
+            <target name="clean-cuke">
+                <delete dir="target"/>
+            </target>
+
+            <target name="clobbercuke" depends="clean-cuke">
+                <delete dir="${lib.dir}"/>
+            </target>
+</project>
